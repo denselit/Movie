@@ -1,5 +1,9 @@
 import streamlit as st
-from moviepy.editor import *
+from moviepy import (
+    AudioFileClip,
+    ImageClip,
+    concatenate_videoclips
+)
 import tempfile
 import librosa
 import numpy as np
