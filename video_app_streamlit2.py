@@ -157,13 +157,20 @@ if st.button("🎬 영상 만들기", type="primary", use_container_width=True):
 
         progress.progress(60, text="영상 렌더링 중... (시간이 걸릴 수 있습니다)")
 
-        # 영상 합성
+         # 영상 합성
         try:
             video = concatenate_videoclips(clips, method="compose")
             video = video.with_audio(audio_clip)
 
             output_path = os.path.join(tmp_dir, "result.mp4")
-            video.write_videofile(output_path, fps=24, logger=None)
+            video.write_videofile(
+                output_path,
+                fps=24,
+                codec="libx264",
+                audio_codec="aac",
+                ffmpeg_params=["-pix_fmt", "yuv420p"],
+                logger=None
+            )
         except Exception as e:
             st.error(f"영상 생성 실패: {e}")
             st.stop()
