@@ -107,12 +107,12 @@ if st.button("🎬 영상 만들기", type="primary", use_container_width=True):
         for i in range(n):
             start = cut_points[i]
             end = cut_points[i + 1] if i + 1 < len(cut_points) else audio_clip.duration
-            duration = max(0.5, end - start)
+            duration = max(3, end - start)
 
             clip = (
                 ImageClip(image_paths[i])
                 .with_duration(duration)
-                .with_effects([vfx.FadeIn(0.3), vfx.FadeOut(0.3)])
+                .with_effects([vfx.FadeIn(1), vfx.FadeOut(1)])
             )
             clips.append(clip)
 
