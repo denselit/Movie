@@ -13,8 +13,8 @@ st.set_page_config(
     layout="centered"
 )
 
-st.title("🎬 Beat Video Maker")
-st.caption("이미지와 음악을 업로드하면 비트에 맞춰 자동으로 영상을 만들어드립니다.")
+st.title("🎬 Music Visual Maker")
+st.caption("이미지와 음악을 업로드하면 음악의 흐름에 맞춰 자동으로 영상을 만들어드립니다.")
 
 # ── 파일 업로드 ──────────────────────────────────────────────
 st.subheader("📁 파일 업로드")
@@ -107,12 +107,12 @@ if st.button("🎬 영상 만들기", type="primary", use_container_width=True):
         for i in range(n):
             start = cut_points[i]
             end = cut_points[i + 1] if i + 1 < len(cut_points) else audio_clip.duration
-            duration = max(3, end - start)
+            duration = max(3.0, end - start)  # 풍경화: 최소 3초 유지
 
             clip = (
                 ImageClip(image_paths[i])
                 .with_duration(duration)
-                .with_effects([vfx.FadeIn(1), vfx.FadeOut(1)])
+                .with_effects([vfx.FadeIn(1.0), vfx.FadeOut(1.0)])  # 부드러운 1초 전환
             )
             clips.append(clip)
 
@@ -124,7 +124,14 @@ if st.button("🎬 영상 만들기", type="primary", use_container_width=True):
             video = video.with_audio(audio_clip)
 
             output_path = os.path.join(tmp_dir, "result.mp4")
-            video.write_videofile(output_path, fps=24, logger=None)
+            video.write_videofile(
+                output_path,
+                fps=24,
+                codec="libx264",
+                audio_codec="aac",
+                ffmpeg_params=["-pix_fmt", "yuv420p"],
+                logger=None
+            )
         except Exception as e:
             st.error(f"영상 생성 실패: {e}")
             st.stop()
