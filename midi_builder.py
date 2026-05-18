@@ -12,19 +12,29 @@ st.set_page_config(
 NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 
 DEFAULT_MELODY = [
-    {"note": 57, "duration": 1.0, "velocity": 92},
-    {"note": 59, "duration": 1.0, "velocity": 90},
-    {"note": 60, "duration": 1.0, "velocity": 94},
-    {"note": 59, "duration": 1.0, "velocity": 88},
+    {"note": 69, "duration": 1.0, "velocity": 92},
+    {"note": 71, "duration": 1.0, "velocity": 90},
+    {"note": 72, "duration": 1.0, "velocity": 94},
+    {"note": 71, "duration": 1.0, "velocity": 88},
 
-    {"note": 62, "duration": 1.0, "velocity": 96},
-    {"note": 60, "duration": 1.0, "velocity": 90},
-    {"note": 59, "duration": 1.0, "velocity": 84},
-    {"note": 57, "duration": 1.0, "velocity": 82},
+    {"note": 74, "duration": 1.0, "velocity": 96},
+    {"note": 72, "duration": 1.0, "velocity": 90},
+    {"note": 71, "duration": 1.0, "velocity": 84},
+    {"note": 69, "duration": 1.0, "velocity": 82},
 
-    {"note": 65, "duration": 2.0, "velocity": 76},
-    {"note": 64, "duration": 3.0, "velocity": 62},
+    {"note": 77, "duration": 2.0, "velocity": 76},
+    {"note": 76, "duration": 3.0, "velocity": 62},
 ]
+
+KOREAN_NOTE_MAP = {
+    "도": 60,
+    "레": 62,
+    "미": 64,
+    "파": 65,
+    "솔": 67,
+    "라": 69,
+    "시": 71
+}
 
 CHORDS = [
     "Am(add9)",
@@ -69,12 +79,13 @@ def create_midi(sequence, bpm=72):
     return output
 
 
-st.title("🎼 Neo-Classical MIDI Builder")
+st.title("🎼 Neo-Classical Motif Sketchpad")
 
 st.markdown(
     """
-A sequence-based MIDI sketch tool designed for:
+A melody-first MIDI sketch tool designed for:
 
+- Korean solfege note input
 - melodic phrasing
 - cinematic harmony
 - neo-classical motif writing
@@ -86,6 +97,88 @@ A sequence-based MIDI sketch tool designed for:
 col1, col2 = st.columns([2, 1])
 
 with col1:
+    st.subheader("Korean Solfege Melody Input")
+
+    solfege_input = st.text_area(
+        "Enter melody using Korean note names",
+        value="라 시 도 시 / 레 도 시 라 / 파 미",
+        height=120
+    )
+
+    st.caption("Use spaces between notes and / for phrase separation")
+
+    parsed_sequence = []
+
+    phrases = [p.strip() for p in solfege_input.split("/") if p.strip()]
+
+    for phrase in phrases:
+        notes = phrase.split()
+
+        for idx, note_name in enumerate(notes):
+            if note_name not in KOREAN_NOTE_MAP:
+                continue
+
+            duration = 1.0
+
+            if phrase == phrases[-1] and idx == len(notes) - 1:
+                duration = 3.0
+            elif phrase == phrases[-1]:
+                duration = 2.0
+
+            velocity = 90
+
+            if phrase == phrases[-1]:
+                velocity = 70
+
+            parsed_sequence.append({
+                "note": KOREAN_NOTE_MAP[note_name],
+                "duration": duration,
+                "velocity": velocity
+            })
+
+    melody_data = []
+
+    st.subheader("Parsed Melody Sequence")
+
+    for i, note_data in enumerate(parsed_sequence):
+        with st.expander(f"Note {i+1} — {midi_to_name(note_data['note'])}"):
+            c1, c2, c3 = st.columns(3)
+
+            with c1:
+                pitch = st.slider(
+                    "MIDI Note",
+                    min_value=36,
+                    max_value=96,
+                    value=note_data["note"],
+                    key=f"pitch_{i}"
+                )
+
+            with c2:
+                duration = st.slider(
+                    "Duration",
+                    min_value=0.25,
+                    max_value=4.0,
+                    value=float(note_data["duration"]),
+                    step=0.25,
+                    key=f"dur_{i}"
+                )
+
+            with c3:
+                velocity = st.slider(
+                    "Velocity",
+                    min_value=20,
+                    max_value=127,
+                    value=note_data["velocity"],
+                    key=f"vel_{i}"
+                )
+
+            melody_data.append({
+                "note": pitch,
+                "duration": duration,
+                "velocity": velocity
+            })
+
+with col2:
     st.subheader("Melody Sequence")
 
     melody_data = []
