@@ -2,6 +2,11 @@ import streamlit as st
 from midiutil import MIDIFile
 from io import BytesIO
 import pandas as pd
+import re
+
+# --------------------------------------------------
+# PAGE CONFIG
+# --------------------------------------------------
 
 st.set_page_config(
     page_title="Neo-Classical Motif Sketchpad",
@@ -9,35 +14,23 @@ st.set_page_config(
     layout="wide"
 )
 
+# --------------------------------------------------
+# NOTE SYSTEM
+# --------------------------------------------------
+
 NOTE_NAMES = [
     "C", "C#", "D", "D#", "E", "F",
     "F#", "G", "G#", "A", "A#", "B"
 ]
 
-KOREAN_NOTE_MAP = {
-    "도": 60,
-    "도#": 61,
-    "레b": 61,
-
-    "레": 62,
-    "레#": 63,
-    "미b": 63,
-
-    "미": 64,
-
-    "파": 65,
-    "파#": 66,
-    "솔b": 66,
-
-    "솔": 67,
-    "솔#": 68,
-    "라b": 68,
-
-    "라": 69,
-    "라#": 70,
-    "시b": 70,
-
-    "시": 71
+NOTE_BASE = {
+    "도": 0,
+    "레": 2,
+    "미": 4,
+    "파": 5,
+    "솔": 7,
+    "라": 9,
+    "시": 11
 }
 
 CHORD_SUGGESTIONS = [
@@ -46,14 +39,56 @@ CHORD_SUGGESTIONS = [
     "Fmaj7"
 ]
 
+# --------------------------------------------------
+# MIDI → NOTE NAME
+# --------------------------------------------------
 
 def midi_to_name(midi_note):
+
     note = NOTE_NAMES[midi_note % 12]
     octave = (midi_note // 12) - 1
+
     return f"{note}{octave}"
 
+# --------------------------------------------------
+# PARSE SINGLE NOTE
+# Example:
+# 라4
+# 도#5
+# 미♭3
+# --------------------------------------------------
 
-def parse_korean_melody(text):
+def parse_note(note_text):
+
+    pattern = r"([도레미파솔라시])([#♯b♭]?)(\d)"
+
+    match = re.match(pattern, note_text)
+
+    if not match:
+        return None
+
+    note_name, accidental, octave = match.groups()
+
+    semitone = NOTE_BASE[note_name]
+
+    # Sharp
+    if accidental in ["#", "♯"]:
+        semitone += 1
+
+    # Flat
+    if accidental in ["b", "♭"]:
+        semitone -= 1
+
+    midi_note = semitone + ((int(octave) + 1) * 12)
+
+    return midi_note
+
+# --------------------------------------------------
+# PARSE MELODY TEXT
+# --------------------------------------------------
+
+def parse_melody(text):
+
     parsed_sequence = []
 
     phrases = [
@@ -63,34 +98,32 @@ def parse_korean_melody(text):
     ]
 
     for phrase_index, phrase in enumerate(phrases):
+
         notes = phrase.split()
 
-        for note_index, note_name in enumerate(notes):
+        for note_index, note_text in enumerate(notes):
 
-            if note_name not in KOREAN_NOTE_MAP:
+            midi_note = parse_note(note_text)
+
+            if midi_note is None:
                 continue
 
-            midi_note = KOREAN_NOTE_MAP[note_name]
-
-            # 기본 duration
+            # Default values
             duration = 1.0
+            velocity = 90
 
-            # 마지막 phrase는 더 길게
+            # Softer ending phrase
             if phrase_index == len(phrases) - 1:
                 duration = 2.0
+                velocity = 72
 
-            # 마지막 note는 가장 길게
+            # Final note
             if (
                 phrase_index == len(phrases) - 1
                 and note_index == len(notes) - 1
             ):
                 duration = 3.0
-
-            # velocity shaping
-            velocity = 90
-
-            if phrase_index == len(phrases) - 1:
-                velocity = 72
+                velocity = 60
 
             parsed_sequence.append({
                 "note": midi_note,
@@ -100,6 +133,9 @@ def parse_korean_melody(text):
 
     return parsed_sequence
 
+# --------------------------------------------------
+# CREATE MIDI
+# --------------------------------------------------
 
 def create_midi(sequence, bpm=72):
 
@@ -134,15 +170,16 @@ def create_midi(sequence, bpm=72):
 
     return output
 
-
-# ---------------- UI ---------------- #
+# --------------------------------------------------
+# UI
+# --------------------------------------------------
 
 st.title("🎼 Neo-Classical Motif Sketchpad")
 
 st.markdown("""
 A melody-first composition tool designed for:
 
-- Korean solfege melody input
+- Korean note input with octave support
 - cinematic phrasing
 - neo-classical motif sketching
 - expressive timing & velocity
@@ -151,23 +188,28 @@ A melody-first composition tool designed for:
 
 col1, col2 = st.columns([2, 1])
 
-# ---------------- LEFT ---------------- #
+# --------------------------------------------------
+# LEFT PANEL
+# --------------------------------------------------
 
 with col1:
 
-    st.subheader("Korean Solfege Input")
+    st.subheader("Melody Input")
 
     solfege_input = st.text_area(
         "Enter melody",
-        value="라 시 도 시 / 레 도 시 라 / 파 미",
-        height=120
+        value="라4 시4 도5 시4 / 레5 도5 시4 라4 / 파4 미4",
+        height=140
     )
 
-    st.caption(
-        "Use spaces between notes and / for phrase separation"
-    )
+    st.caption("""
+Examples:
+- 라4 시4 도5
+- 파#4 솔4 라♭4
+- Use / for phrase separation
+""")
 
-    parsed_sequence = parse_korean_melody(solfege_input)
+    parsed_sequence = parse_melody(solfege_input)
 
     melody_data = []
 
@@ -181,15 +223,18 @@ with col1:
 
             c1, c2, c3 = st.columns(3)
 
-            # 고유 key 생성
-            unique_key = f"{i}_{note_data['note']}_{note_data['duration']}"
+            unique_key = (
+                f"{i}_"
+                f"{note_data['note']}_"
+                f"{note_data['duration']}"
+            )
 
             with c1:
 
                 pitch = st.slider(
                     "MIDI Note",
-                    min_value=36,
-                    max_value=96,
+                    min_value=24,
+                    max_value=108,
                     value=note_data["note"],
                     key=f"pitch_{unique_key}"
                 )
@@ -199,7 +244,7 @@ with col1:
                 duration = st.slider(
                     "Duration",
                     min_value=0.25,
-                    max_value=4.0,
+                    max_value=6.0,
                     value=float(note_data["duration"]),
                     step=0.25,
                     key=f"dur_{unique_key}"
@@ -221,13 +266,16 @@ with col1:
                 "velocity": velocity
             })
 
-# ---------------- RIGHT ---------------- #
+# --------------------------------------------------
+# RIGHT PANEL
+# --------------------------------------------------
 
 with col2:
 
     st.subheader("Harmonic Direction")
 
     for chord in CHORD_SUGGESTIONS:
+
         st.markdown(f"### {chord}")
 
     st.divider()
@@ -235,19 +283,33 @@ with col2:
     bpm = st.slider(
         "Tempo (BPM)",
         min_value=40,
-        max_value=160,
+        max_value=180,
         value=72
     )
 
-    st.markdown("### Phrase Structure")
+    st.divider()
+
+    st.markdown("### Phrase Shape")
 
     st.markdown("""
-- A B C B
-- D C B A
-- F → E
+- Ascending opening
+- Descending response
+- Suspended ending
 """)
 
-# ---------------- TABLE ---------------- #
+    st.divider()
+
+    st.markdown("### Expression")
+
+    st.markdown("""
+- Longer ending durations
+- Softer final phrase
+- Neo-classical cadence shaping
+""")
+
+# --------------------------------------------------
+# TABLE
+# --------------------------------------------------
 
 st.divider()
 
@@ -268,7 +330,9 @@ st.dataframe(
     use_container_width=True
 )
 
-# ---------------- MIDI EXPORT ---------------- #
+# --------------------------------------------------
+# MIDI EXPORT
+# --------------------------------------------------
 
 midi_file = create_midi(
     melody_data,
@@ -282,7 +346,9 @@ st.download_button(
     mime="audio/midi"
 )
 
-# ---------------- FOOTER ---------------- #
+# --------------------------------------------------
+# FOOTER
+# --------------------------------------------------
 
 st.divider()
 
@@ -292,8 +358,8 @@ st.markdown("""
 - AI chord suggestion
 - motif variation engine
 - orchestration layer
-- cinematic tension analysis
 - piano roll visualization
+- counterpoint assistant
 - MusicGen / Magenta integration
 """)
 
